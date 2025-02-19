@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <title>Anon Chat</title>
+  <!-- Адаптивная верстка для мобильных -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     /* Сброс стилей */
     * {
@@ -58,7 +60,7 @@
       flex: 1;
       display: flex;
       flex-direction: column;
-      display: none; /* по умолчанию скрыт */
+      display: none; /* скрыт до входа */
     }
     /* Верхняя панель */
     #partnerInfo {
@@ -88,7 +90,7 @@
       flex: 1;
       padding: 10px;
       overflow-y: auto;
-      background: #e5ddd5; /* Нежный фон, похожий на Telegram */
+      background: #e5ddd5;
     }
     .system-message {
       text-align: center;
@@ -120,10 +122,16 @@
       margin-left: 10px;
       border-bottom-left-radius: 0;
     }
+    .media-thumb {
+      max-width: 200px;
+      display: block;
+      margin: 5px 0;
+    }
 
-    /* Поле ввода + кнопка */
+    /* Поле ввода + кнопки */
     #inputArea {
       display: flex;
+      align-items: center;
       background: #fff;
       padding: 8px;
       box-shadow: 0 -1px 4px rgba(0,0,0,0.1);
@@ -136,28 +144,45 @@
       border-radius: 4px;
       margin-right: 8px;
     }
-    #sendBtn {
+    #sendBtn, #uploadBtn {
       background: #2a9df4;
       color: #fff;
       border: none;
-      padding: 10px 20px;
+      padding: 10px 12px;
       border-radius: 4px;
       cursor: pointer;
       font-size: 14px;
+      margin-right: 8px;
     }
-    #sendBtn:hover {
+    #sendBtn:hover, #uploadBtn:hover {
       background: #238ad3;
     }
 
+    /* Адаптивность */
+    @media (max-width: 600px) {
+      .my-message, .partner-message {
+        max-width: 80%;
+        font-size: 15px;
+      }
+      #profileForm {
+        padding: 10px;
+      }
+      #inputArea {
+        flex-direction: row;
+      }
+      #messageInput {
+        margin-bottom: 0;
+      }
+    }
   </style>
 </head>
 <body>
 
   <!-- Форма профиля -->
   <div id="profileForm">
-    <h3>Создайте анонимный профиль</h3>
-    <label for="nickname">Ник</label>
-    <input type="text" id="nickname" placeholder="Введите ник..." />
+    <h3>Анонимный профиль</h3>
+    <label for="nickname">Ник (только буквы)</label>
+    <input type="text" id="nickname" placeholder="Введите ник" />
 
     <label for="gender">Пол</label>
     <select id="gender">
@@ -165,8 +190,8 @@
       <option value="f">Женский</option>
     </select>
 
-    <label for="age">Возраст</label>
-    <input type="number" id="age" placeholder="Укажите возраст" />
+    <label for="age">Возраст (только цифры)</label>
+    <input type="text" id="age" placeholder="Например, 25" />
 
     <button id="saveProfileBtn">Начать</button>
   </div>
@@ -183,15 +208,16 @@
     <div id="inputArea">
       <input type="text" id="messageInput" placeholder="Введите сообщение..." />
       <button id="sendBtn">Отправить</button>
+      <button id="uploadBtn">Файл</button>
+      <input type="file" id="fileInput" style="display: none;" />
     </div>
   </div>
 
-  <!-- Подключение Socket.io -->
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
 
-    // Элементы
+    // DOM-элементы
     const profileForm = document.getElementById('profileForm');
     const nicknameInput = document.getElementById('nickname');
     const genderSelect = document.getElementById('gender');
@@ -205,31 +231,41 @@
 
     const messageInput = document.getElementById('messageInput');
     const sendBtn = document.getElementById('sendBtn');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const fileInput = document.getElementById('fileInput');
 
     let partnerId = null;
 
-    // 1. Сохранение профиля
+    // 1. Сохранение профиля с валидацией
     saveProfileBtn.addEventListener('click', () => {
       const nickname = nicknameInput.value.trim();
       const gender = genderSelect.value;
       const age = ageInput.value.trim();
 
-      if (!nickname || !age) {
-        alert('Введите ник и возраст!');
+      // Валидация ника (только буквы)
+      if (!/^[A-Za-zА-Яа-я]+$/.test(nickname)) {
+        alert('Ник может содержать только буквы (без цифр и символов).');
         return;
       }
 
-      // Отправляем на сервер
-      socket.emit('setProfile', { nickname, gender, age });
+      // Валидация возраста (только цифры)
+      if (!/^\d+$/.test(age)) {
+        alert('Возраст должен содержать только цифры.');
+        return;
+      }
 
-      // Показываем чат, скрываем форму
+      if (!nickname || !age) {
+        alert('Заполните ник и возраст!');
+        return;
+      }
+
+      socket.emit('setProfile', { nickname, gender, age });
       profileForm.style.display = 'none';
       chatContainer.style.display = 'flex';
-
       addSystemMessage('Ищем собеседника...');
     });
 
-    // 2. Когда сервер говорит, что чат готов
+    // 2. Когда сервер сообщает, что чат готов
     socket.on('chatReady', (data) => {
       partnerId = data.partnerId;
       const p = data.partnerProfile;
@@ -237,24 +273,28 @@
       addSystemMessage('Собеседник найден! Можете общаться.');
     });
 
-    // 3. Когда приходит сообщение
+    // 3. Пришло сообщение
     socket.on('receiveMessage', (msg) => {
       addPartnerMessage(msg.text);
     });
 
-    // 4. Когда собеседник покинул чат
+    // 4. Пришло медиа
+    socket.on('receiveMedia', (data) => {
+      const { fileUrl } = data;
+      addPartnerMedia(fileUrl);
+    });
+
+    // 5. Собеседник покинул чат
     socket.on('partnerLeft', () => {
       addSystemMessage('Собеседник вышел. Нажмите «Следующий» или обновите страницу.');
       partnerLabel.innerText = 'Собеседник: -';
       partnerId = null;
     });
 
-    // 5. Отправка сообщения
+    // 6. Отправка сообщения
     sendBtn.addEventListener('click', sendMessage);
     messageInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        sendMessage();
-      }
+      if (e.key === 'Enter') sendMessage();
     });
 
     function sendMessage() {
@@ -265,7 +305,7 @@
       messageInput.value = '';
     }
 
-    // 6. Кнопка «Следующий»
+    // 7. «Следующий»
     skipBtn.addEventListener('click', () => {
       socket.emit('skip');
       partnerId = null;
@@ -274,7 +314,40 @@
       addSystemMessage('Ищем нового собеседника...');
     });
 
-    // Утилиты
+    // 8. Отправка файлов
+    uploadBtn.addEventListener('click', () => {
+      fileInput.click(); // откроем диалог выбора файла
+    });
+
+    fileInput.addEventListener('change', async () => {
+      const file = fileInput.files[0];
+      if (!file || !partnerId) return;
+
+      // Отправим на сервер через fetch POST /upload
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const res = await fetch('/upload', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+        if (data.fileUrl) {
+          // Отправим socket-событие партнеру
+          socket.emit('sendMedia', data.fileUrl);
+          // Добавим в свой чат
+          addMyMedia(data.fileUrl);
+        }
+      } catch (err) {
+        console.error('Upload error:', err);
+      }
+
+      fileInput.value = ''; // сбросим инпут
+    });
+
+    // -- Утилиты вывода сообщений --
+
     function addMyMessage(text) {
       const div = document.createElement('div');
       div.className = 'my-message';
@@ -289,6 +362,40 @@
       div.innerText = text;
       chat.appendChild(div);
       chat.scrollTop = chat.scrollHeight;
+    }
+
+    // Отображение собственного медиа
+    function addMyMedia(url) {
+      const div = document.createElement('div');
+      div.className = 'my-message';
+      div.innerHTML = renderMedia(url);
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    // Отображение медиа от собеседника
+    function addPartnerMedia(url) {
+      const div = document.createElement('div');
+      div.className = 'partner-message';
+      div.innerHTML = renderMedia(url);
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    // В зависимости от типа файла показываем картинку или ссылку
+    function renderMedia(url) {
+      // Можем по расширению/контент-типу определять, картинка ли это
+      const lower = url.toLowerCase();
+      if (lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.gif')) {
+        return `<img src="${url}" class="media-thumb" alt="image" />`;
+      } else if (lower.endsWith('.mp4') || lower.endsWith('.webm') || lower.endsWith('.mov')) {
+        return `<video src="${url}" class="media-thumb" controls></video>`;
+      } else if (lower.endsWith('.mp3') || lower.endsWith('.wav') || lower.endsWith('.ogg')) {
+        return `<audio src="${url}" class="media-thumb" controls></audio>`;
+      } else {
+        // Прочие форматы - просто ссылка
+        return `<a href="${url}" target="_blank">Скачать файл</a>`;
+      }
     }
 
     function addSystemMessage(text) {
