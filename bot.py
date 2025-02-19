@@ -7,7 +7,7 @@ const token = process.env.BOT_TOKEN || '8039344227:AAFuRzP92ZoGOxRC3EOWF-OXVIyjf
 const bot = new TelegramBot(token, { polling: true });
 
 // Этот URL — ваш WebApp (анонимный чат), например, домен Railway
-const WEBAPP_URL = 'https://<имя-проекта>.up.railway.app'; 
+const WEBAPP_URL = 'anonchat-production-5964.up.railway.app'; 
 
 // Обработка команды /start
 bot.onText(/\/start/, (msg) => {
