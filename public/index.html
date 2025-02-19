@@ -2,119 +2,185 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>Анонимный чат</title>
+  <title>Anon Chat</title>
   <style>
+    /* Reset */
+    * {
+      box-sizing: border-box;
+    }
     body {
-      font-family: sans-serif;
-      margin: 0; padding: 0;
-      display: flex; flex-direction: column;
+      margin: 0;
+      padding: 0;
+      font-family: "Helvetica Neue", Arial, sans-serif;
+      background: #f9f9f9;
+      display: flex;
+      flex-direction: column;
       height: 100vh;
+      color: #333;
     }
 
-    /* Форма профиля */
+    /* Шапка для профиля / формы */
     #profileForm {
       padding: 20px;
+      background: #fff;
+      box-shadow: 0 0 4px rgba(0,0,0,0.1);
     }
+    #profileForm h3 {
+      margin-top: 0;
+    }
+    #profileForm label {
+      font-weight: bold;
+    }
+    #profileForm input,
+    #profileForm select {
+      width: 100%;
+      margin-top: 5px;
+      margin-bottom: 15px;
+      padding: 8px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    #profileForm button {
+      padding: 10px 20px;
+      background: #2a9df4;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    #profileForm button:hover {
+      background: #238ad3;
+    }
+
+    /* Контейнер чата */
     #chatContainer {
       flex: 1;
       display: flex;
       flex-direction: column;
-      border-top: 1px solid #ccc;
-      display: none; /* изначально скрыто */
+      display: none; /* Initially hidden */
     }
-
+    /* Верхняя панель */
     #partnerInfo {
-      background: #f0f0f0;
-      padding: 10px;
-      font-weight: bold;
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: space-between;
+      background: #fff;
+      padding: 10px 20px;
+      box-shadow: 0 0 4px rgba(0,0,0,0.1);
+      font-weight: bold;
     }
     #skipBtn {
-      background: #ff7878;
+      background: #ff5c5c;
       border: none;
-      padding: 5px 10px;
+      padding: 6px 12px;
+      border-radius: 4px;
       cursor: pointer;
+      color: #fff;
       font-weight: bold;
     }
+    #skipBtn:hover {
+      background: #d94a4a;
+    }
 
+    /* Окно сообщений */
     #chat {
       flex: 1;
       padding: 10px;
       overflow-y: auto;
-      border-bottom: 1px solid #ccc;
-    }
-    .my-message {
-      text-align: right;
-      background: #d1ffd1;
-      margin: 5px;
-      padding: 5px;
-      border-radius: 5px;
-      display: inline-block;
-      max-width: 80%;
-      word-wrap: break-word;
-    }
-    .partner-message {
-      text-align: left;
-      background: #eeeeee;
-      margin: 5px;
-      padding: 5px;
-      border-radius: 5px;
-      display: inline-block;
-      max-width: 80%;
-      word-wrap: break-word;
-    }
-    .system-message {
-      text-align: center;
-      color: #999;
-      font-style: italic;
-      margin: 5px;
+      background: #e5ddd5; /* Telegram-like background */
     }
 
+    .system-message {
+      text-align: center;
+      color: #666;
+      font-size: 14px;
+      margin: 10px 0;
+      font-style: italic;
+    }
+    .my-message,
+    .partner-message {
+      max-width: 60%;
+      padding: 8px 12px;
+      margin: 6px 0;
+      border-radius: 8px;
+      line-height: 1.4;
+      word-wrap: break-word;
+    }
+    .my-message {
+      margin-left: auto;
+      background: #b2f1ff; /* light blue */
+      text-align: left;
+      margin-right: 10px;
+      border-bottom-right-radius: 0;
+    }
+    .partner-message {
+      margin-right: auto;
+      background: #fff;
+      text-align: left;
+      margin-left: 10px;
+      border-bottom-left-radius: 0;
+    }
+
+    /* Поле ввода + кнопка */
     #inputArea {
       display: flex;
+      background: #fff;
+      padding: 8px;
+      box-shadow: 0 -1px 4px rgba(0,0,0,0.1);
     }
     #messageInput {
       flex: 1;
-      padding: 5px;
-      font-size: 16px;
+      padding: 10px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      margin-right: 8px;
     }
     #sendBtn {
-      padding: 5px 15px;
-      font-size: 16px;
+      background: #2a9df4;
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
       cursor: pointer;
+      font-size: 14px;
     }
+    #sendBtn:hover {
+      background: #238ad3;
+    }
+
   </style>
 </head>
 <body>
 
-  <!-- Форма профиля: ник, пол, возраст -->
+  <!-- Форма профиля -->
   <div id="profileForm">
-    <h3>Введите данные для анонимного профиля</h3>
-    <label for="nickname">Ник:</label><br />
-    <input type="text" id="nickname" /><br /><br />
+    <h3>Создайте анонимный профиль</h3>
+    <label for="nickname">Ник</label>
+    <input type="text" id="nickname" placeholder="Введите ник..." />
 
-    <label for="gender">Пол:</label><br />
+    <label for="gender">Пол</label>
     <select id="gender">
       <option value="m">Мужской</option>
       <option value="f">Женский</option>
-    </select><br /><br />
+    </select>
 
-    <label for="age">Возраст:</label><br />
-    <input type="number" id="age" /><br /><br />
+    <label for="age">Возраст</label>
+    <input type="number" id="age" placeholder="Возраст" />
 
-    <button id="saveProfileBtn">Сохранить</button>
+    <button id="saveProfileBtn">Начать</button>
   </div>
 
-  <!-- Контейнер чата -->
+  <!-- Чат -->
   <div id="chatContainer">
     <div id="partnerInfo">
       <span id="partnerLabel">Собеседник: -</span>
       <button id="skipBtn">Следующий</button>
     </div>
     <div id="chat">
-      <div class="system-message">Ожидание подключения к собеседнику...</div>
+      <div class="system-message">Ожидание собеседника...</div>
     </div>
     <div id="inputArea">
       <input type="text" id="messageInput" placeholder="Введите сообщение..." />
@@ -127,7 +193,7 @@
   <script>
     const socket = io();
 
-    // Элементы DOM
+    // DOM-элементы
     const profileForm = document.getElementById('profileForm');
     const nicknameInput = document.getElementById('nickname');
     const genderSelect = document.getElementById('gender');
@@ -142,7 +208,6 @@
     const messageInput = document.getElementById('messageInput');
     const sendBtn = document.getElementById('sendBtn');
 
-    // Локальные переменные
     let partnerId = null;
 
     // 1. Сохранение профиля
@@ -152,36 +217,33 @@
       const age = ageInput.value.trim();
 
       if (!nickname || !age) {
-        alert('Введите ник и возраст!');
+        alert('Введите ник и возраст');
         return;
       }
-      // Отправляем профиль на сервер
       socket.emit('setProfile', { nickname, gender, age });
 
-      // Скрываем форму, показываем чат
       profileForm.style.display = 'none';
       chatContainer.style.display = 'flex';
 
       addSystemMessage('Ищем собеседника...');
     });
 
-    // 2. Когда сервер говорит "chatReady", чат создан
+    // 2. Когда чат готов
     socket.on('chatReady', (data) => {
       partnerId = data.partnerId;
       const p = data.partnerProfile;
-      // Показываем на экране информацию о партнёре
-      partnerLabel.innerText = `Собеседник: ${p.nickname} (${p.gender === 'm' ? 'М' : 'Ж'}, ${p.age} лет)`;
+      partnerLabel.innerText = `Собеседник: ${p.nickname} (${p.gender === 'm' ? 'М' : 'Ж'}, ${p.age})`;
       addSystemMessage('Собеседник найден! Можете общаться.');
     });
 
-    // 3. Получение сообщения от собеседника
+    // 3. Получение сообщения
     socket.on('receiveMessage', (msg) => {
       addPartnerMessage(msg.text);
     });
 
-    // 4. Если собеседник покинул чат
+    // 4. Собеседник покинул чат
     socket.on('partnerLeft', () => {
-      addSystemMessage('Собеседник вышел из чата. Нажмите "Следующий" или обновите страницу.');
+      addSystemMessage('Собеседник вышел. Нажмите «Следующий» или обновите страницу.');
       partnerLabel.innerText = 'Собеседник: -';
       partnerId = null;
     });
@@ -202,17 +264,16 @@
       messageInput.value = '';
     }
 
-    // 6. Кнопка "Следующий" (skip)
+    // 6. «Следующий»
     skipBtn.addEventListener('click', () => {
-      // Запрос серверу пропустить текущего собеседника
       socket.emit('skip');
-      // Очистим чат и информацию
+      partnerId = null;
       partnerLabel.innerText = 'Собеседник: -';
       chat.innerHTML = '';
       addSystemMessage('Ищем нового собеседника...');
     });
 
-    // Утилиты для отображения сообщений
+    // Утилиты
     function addMyMessage(text) {
       const div = document.createElement('div');
       div.className = 'my-message';
