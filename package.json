@@ -1,14 +1,14 @@
 {
-  "name": "anonchat",
+  "name": "anonchat-sqlite",
   "version": "1.0.0",
-  "description": "Anonymous Chat with profiles",
+  "description": "Anonymous chat with SQLite database",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
     "express": "^4.18.2",
-    "socket.io": "^4.5.4"
+    "socket.io": "^4.5.4",
     "sqlite3": "^5.1.6"
   }
 }
