@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <title>Anon Chat</title>
   <style>
-    /* Reset */
+    /* Сброс стилей */
     * {
       box-sizing: border-box;
     }
@@ -19,7 +19,7 @@
       color: #333;
     }
 
-    /* Шапка для профиля / формы */
+    /* Форма профиля */
     #profileForm {
       padding: 20px;
       background: #fff;
@@ -34,8 +34,7 @@
     #profileForm input,
     #profileForm select {
       width: 100%;
-      margin-top: 5px;
-      margin-bottom: 15px;
+      margin: 5px 0 15px;
       padding: 8px;
       font-size: 14px;
       border: 1px solid #ccc;
@@ -59,7 +58,7 @@
       flex: 1;
       display: flex;
       flex-direction: column;
-      display: none; /* Initially hidden */
+      display: none; /* по умолчанию скрыт */
     }
     /* Верхняя панель */
     #partnerInfo {
@@ -89,9 +88,8 @@
       flex: 1;
       padding: 10px;
       overflow-y: auto;
-      background: #e5ddd5; /* Telegram-like background */
+      background: #e5ddd5; /* Нежный фон, похожий на Telegram */
     }
-
     .system-message {
       text-align: center;
       color: #666;
@@ -110,7 +108,7 @@
     }
     .my-message {
       margin-left: auto;
-      background: #b2f1ff; /* light blue */
+      background: #b2f1ff; /* голубой */
       text-align: left;
       margin-right: 10px;
       border-bottom-right-radius: 0;
@@ -168,7 +166,7 @@
     </select>
 
     <label for="age">Возраст</label>
-    <input type="number" id="age" placeholder="Возраст" />
+    <input type="number" id="age" placeholder="Укажите возраст" />
 
     <button id="saveProfileBtn">Начать</button>
   </div>
@@ -188,12 +186,12 @@
     </div>
   </div>
 
-  <!-- Socket.io -->
+  <!-- Подключение Socket.io -->
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
 
-    // DOM-элементы
+    // Элементы
     const profileForm = document.getElementById('profileForm');
     const nicknameInput = document.getElementById('nickname');
     const genderSelect = document.getElementById('gender');
@@ -217,18 +215,21 @@
       const age = ageInput.value.trim();
 
       if (!nickname || !age) {
-        alert('Введите ник и возраст');
+        alert('Введите ник и возраст!');
         return;
       }
+
+      // Отправляем на сервер
       socket.emit('setProfile', { nickname, gender, age });
 
+      // Показываем чат, скрываем форму
       profileForm.style.display = 'none';
       chatContainer.style.display = 'flex';
 
       addSystemMessage('Ищем собеседника...');
     });
 
-    // 2. Когда чат готов
+    // 2. Когда сервер говорит, что чат готов
     socket.on('chatReady', (data) => {
       partnerId = data.partnerId;
       const p = data.partnerProfile;
@@ -236,12 +237,12 @@
       addSystemMessage('Собеседник найден! Можете общаться.');
     });
 
-    // 3. Получение сообщения
+    // 3. Когда приходит сообщение
     socket.on('receiveMessage', (msg) => {
       addPartnerMessage(msg.text);
     });
 
-    // 4. Собеседник покинул чат
+    // 4. Когда собеседник покинул чат
     socket.on('partnerLeft', () => {
       addSystemMessage('Собеседник вышел. Нажмите «Следующий» или обновите страницу.');
       partnerLabel.innerText = 'Собеседник: -';
@@ -264,7 +265,7 @@
       messageInput.value = '';
     }
 
-    // 6. «Следующий»
+    // 6. Кнопка «Следующий»
     skipBtn.addEventListener('click', () => {
       socket.emit('skip');
       partnerId = null;
