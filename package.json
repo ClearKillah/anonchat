@@ -1,7 +1,7 @@
 {
-  "name": "anon-telegram-webapp",
+  "name": "anonchat",
   "version": "1.0.0",
-  "description": "Anonymous Chat for Telegram Mini App",
+  "description": "Anonymous Chat with profiles",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
