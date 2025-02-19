@@ -1,0 +1,13 @@
+{
+  "name": "anon-telegram-webapp",
+  "version": "1.0.0",
+  "description": "Anonymous Chat for Telegram Mini App",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.5.4"
+  }
+}

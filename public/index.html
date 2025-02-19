@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Анонимный чат</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0; padding: 0;
+      display: flex; flex-direction: column;
+      height: 100vh;
+    }
+    #chat {
+      flex: 1;
+      border: 1px solid #ccc;
+      padding: 10px;
+      overflow-y: auto;
+    }
+    #inputArea {
+      display: flex;
+    }
+    #messageInput {
+      flex: 1;
+      padding: 5px;
+      font-size: 16px;
+    }
+    #sendBtn {
+      padding: 5px 15px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .my-message {
+      text-align: right;
+      background: #d1ffd1;
+      margin: 5px;
+      padding: 5px;
+      border-radius: 5px;
+      display: inline-block;
+    }
+    .partner-message {
+      text-align: left;
+      background: #eeeeee;
+      margin: 5px;
+      padding: 5px;
+      border-radius: 5px;
+      display: inline-block;
+    }
+    .system-message {
+      text-align: center;
+      color: #999;
+      font-style: italic;
+      margin: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div id="chat">
+    <div class="system-message">Ожидание подключения...</div>
+  </div>
+  <div id="inputArea">
+    <input type="text" id="messageInput" placeholder="Введите сообщение..." />
+    <button id="sendBtn">Отправить</button>
+  </div>
+
+  <!-- Подключаем Socket.io клиент -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    // Инициализация Telegram WebApp (если нужно учитывать initData и т.д.)
+    if (window.Telegram && Telegram.WebApp) {
+      Telegram.WebApp.ready();
+      // Можно получить некоторые данные о пользователе
+      // const initData = Telegram.WebApp.initDataUnsafe;
+      // Но мы не будем раскрывать их собеседнику, т.к. чат анонимный
+    }
+
+    const socket = io(); // автоматически подключится на текущий домен
+
+    const chat = document.getElementById('chat');
+    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendBtn');
+
+    // При готовности чата
+    socket.on('chatReady', () => {
+      addSystemMessage('Пара найдена! Можете начинать общение.');
+    });
+
+    // При получении сообщения от собеседника
+    socket.on('receiveMessage', (data) => {
+      addPartnerMessage(data.text);
+    });
+
+    // Когда собеседник покинул чат
+    socket.on('partnerLeft', () => {
+      addSystemMessage('Собеседник вышел. Обновите страницу, чтобы начать новый чат.');
+    });
+
+    // Отправка сообщения
+    sendBtn.addEventListener('click', sendMessage);
+    messageInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        sendMessage();
+      }
+    });
+
+    function sendMessage() {
+      const text = messageInput.value.trim();
+      if (!text) return;
+      socket.emit('sendMessage', text);
+      addMyMessage(text);
+      messageInput.value = '';
+    }
+
+    // Утилиты для отображения сообщений в чате
+    function addMyMessage(text) {
+      const div = document.createElement('div');
+      div.className = 'my-message';
+      div.innerText = text;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    function addPartnerMessage(text) {
+      const div = document.createElement('div');
+      div.className = 'partner-message';
+      div.innerText = text;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    function addSystemMessage(text) {
+      const div = document.createElement('div');
+      div.className = 'system-message';
+      div.innerText = text;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+  </script>
+</body>
+</html>
