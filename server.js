@@ -3,79 +3,148 @@ const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
 
-// Инициализируем Express
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Список ожидающих пользователей
-let waitingUser = null;
-
-// Словарь { socketId: partnerSocketId }
-const userPairs = {};
-
-// Статические файлы (Frontend) — папка public
+// Папка со статикой (index.html, css/js)
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Маршрут для проверки работы
+// Для проверки
 app.get('/ping', (req, res) => {
   res.send('Server is running!');
 });
 
-// Логика Socket.io
+// ------------------ ДАННЫЕ НА СЕРВЕРЕ ------------------
+
+// очередь ожидания: хранит socket.id, ждущий собеседника
+let waitingUser = null;
+
+// Пары пользователей { socketId: partnerSocketId }
+const userPairs = {};
+
+// Информация о пользователях { socketId: { nickname, gender, age } }
+const userData = {};
+
+// Лог всех сообщений: массив объектов { from, to, text, timestamp }
+const chatLogs = [];
+
+// ------------------ ЛОГИКА SOCKET.IO -------------------
+
 io.on('connection', (socket) => {
   console.log('New client connected:', socket.id);
 
-  // При подключении сокета проверяем, есть ли кто-то в очереди
-  if (!waitingUser) {
-    // Если никого нет, ставим в очередь
-    waitingUser = socket.id;
-    console.log(`Socket ${socket.id} is now waiting`);
-  } else {
-    // Если кто-то уже ждет, создаём пару
-    userPairs[socket.id] = waitingUser;
-    userPairs[waitingUser] = socket.id;
+  // 1. Сохраняем пустой профиль по умолчанию
+  userData[socket.id] = {
+    nickname: null,
+    gender: null,
+    age: null
+  };
 
-    // Посылаем обоим уведомление об успешном коннекте
-    io.to(socket.id).emit('chatReady', { partner: waitingUser });
-    io.to(waitingUser).emit('chatReady', { partner: socket.id });
+  // Когда пользователь отправил свой профиль
+  socket.on('setProfile', (profile) => {
+    userData[socket.id].nickname = profile.nickname;
+    userData[socket.id].gender = profile.gender;
+    userData[socket.id].age = profile.age;
+    console.log(`Profile set for ${socket.id}:`, userData[socket.id]);
+    // После установки профиля — пытаемся найти пару
+    matchOrWait(socket);
+  });
 
-    console.log(`Socket ${socket.id} matched with ${waitingUser}`);
-    // Очищаем очередь
-    waitingUser = null;
-  }
-
-  // Обработка входящих сообщений
+  // Когда пользователь отправляет сообщение
   socket.on('sendMessage', (message) => {
     const partnerId = userPairs[socket.id];
     if (partnerId) {
-      io.to(partnerId).emit('receiveMessage', { text: message });
+      // Сохраним в общий лог
+      chatLogs.push({
+        from: socket.id,
+        to: partnerId,
+        text: message,
+        timestamp: Date.now()
+      });
+
+      // Пересылаем партнёру
+      io.to(partnerId).emit('receiveMessage', {
+        text: message
+      });
     }
   });
 
-  // Обработка отключения
+  // Когда пользователь нажимает «следующий»
+  socket.on('skip', () => {
+    // Закрываем текущий чат, если он есть
+    endChat(socket.id, true);
+    // Ставим обратно в очередь
+    matchOrWait(socket);
+  });
+
+  // Отключение
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
-
-    // Если пользователь был в очереди, очистим очередь
+    // Удалим из очереди, если был в очереди
     if (waitingUser === socket.id) {
       waitingUser = null;
     }
-
-    // Если пользователь был в паре, оповестим второго
-    const partnerId = userPairs[socket.id];
-    if (partnerId) {
-      // Уведомим второго пользователя, что чат закончился
-      io.to(partnerId).emit('partnerLeft');
-      // Удалим связи
-      delete userPairs[partnerId];
-      delete userPairs[socket.id];
-    }
+    // Завершаем чат с партнёром (если был)
+    endChat(socket.id, false);
+    // Удаляем профиль
+    delete userData[socket.id];
   });
 });
 
+// ------------------ ФУНКЦИИ -------------------
+
+// Функция: ставим сокет в очередь или мэчим с кем-то
+function matchOrWait(socket) {
+  // если никого нет в очереди
+  if (!waitingUser) {
+    waitingUser = socket.id;
+    console.log(`Socket ${socket.id} is now waiting`);
+  } else {
+    // кто-то уже ждет — создаём пару
+    const partnerId = waitingUser;
+    waitingUser = null;
+
+    userPairs[socket.id] = partnerId;
+    userPairs[partnerId] = socket.id;
+
+    // Посылаем обоим, что чат готов, а также профиль собеседника
+    const myProfile = userData[socket.id];
+    const partnerProfile = userData[partnerId];
+
+    io.to(socket.id).emit('chatReady', {
+      partnerId,
+      partnerProfile
+    });
+    io.to(partnerId).emit('chatReady', {
+      partnerId: socket.id,
+      partnerProfile: myProfile
+    });
+
+    console.log(`Socket ${socket.id} matched with ${partnerId}`);
+  }
+}
+
+// Функция: разрывает чат у userId и его партнёра
+// if skip=true — значит userId решил найти другого собеседника
+function endChat(userId, skip) {
+  const partnerId = userPairs[userId];
+  if (partnerId) {
+    // партнёру скажем, что собеседник вышел
+    io.to(partnerId).emit('partnerLeft');
+    // очистим связи
+    delete userPairs[partnerId];
+    delete userPairs[userId];
+    console.log(`Chat ended between ${userId} and ${partnerId}`);
+    // Если skip=true, то партнёра стоит отправить в очередь или нет — решайте по логике
+    // Здесь просто сообщаем, что он остался без собеседника
+    // Если хотите, чтобы он тоже сразу искал нового — можно вызвать matchOrWait(партнёр).
+  }
+}
+
+// ------------------ ЗАПУСК СЕРВЕРА -------------------
+
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
 });
-
