@@ -10,12 +10,68 @@
       display: flex; flex-direction: column;
       height: 100vh;
     }
+
+    /* Форма профиля */
+    #profileForm {
+      padding: 20px;
+    }
+    #chatContainer {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      border-top: 1px solid #ccc;
+      display: none; /* изначально скрыто */
+    }
+
+    #partnerInfo {
+      background: #f0f0f0;
+      padding: 10px;
+      font-weight: bold;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    #skipBtn {
+      background: #ff7878;
+      border: none;
+      padding: 5px 10px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
     #chat {
       flex: 1;
-      border: 1px solid #ccc;
       padding: 10px;
       overflow-y: auto;
+      border-bottom: 1px solid #ccc;
     }
+    .my-message {
+      text-align: right;
+      background: #d1ffd1;
+      margin: 5px;
+      padding: 5px;
+      border-radius: 5px;
+      display: inline-block;
+      max-width: 80%;
+      word-wrap: break-word;
+    }
+    .partner-message {
+      text-align: left;
+      background: #eeeeee;
+      margin: 5px;
+      padding: 5px;
+      border-radius: 5px;
+      display: inline-block;
+      max-width: 80%;
+      word-wrap: break-word;
+    }
+    .system-message {
+      text-align: center;
+      color: #999;
+      font-style: italic;
+      margin: 5px;
+    }
+
     #inputArea {
       display: flex;
     }
@@ -29,72 +85,108 @@
       font-size: 16px;
       cursor: pointer;
     }
-    .my-message {
-      text-align: right;
-      background: #d1ffd1;
-      margin: 5px;
-      padding: 5px;
-      border-radius: 5px;
-      display: inline-block;
-    }
-    .partner-message {
-      text-align: left;
-      background: #eeeeee;
-      margin: 5px;
-      padding: 5px;
-      border-radius: 5px;
-      display: inline-block;
-    }
-    .system-message {
-      text-align: center;
-      color: #999;
-      font-style: italic;
-      margin: 5px;
-    }
   </style>
 </head>
 <body>
-  <div id="chat">
-    <div class="system-message">Ожидание подключения...</div>
-  </div>
-  <div id="inputArea">
-    <input type="text" id="messageInput" placeholder="Введите сообщение..." />
-    <button id="sendBtn">Отправить</button>
+
+  <!-- Форма профиля: ник, пол, возраст -->
+  <div id="profileForm">
+    <h3>Введите данные для анонимного профиля</h3>
+    <label for="nickname">Ник:</label><br />
+    <input type="text" id="nickname" /><br /><br />
+
+    <label for="gender">Пол:</label><br />
+    <select id="gender">
+      <option value="m">Мужской</option>
+      <option value="f">Женский</option>
+    </select><br /><br />
+
+    <label for="age">Возраст:</label><br />
+    <input type="number" id="age" /><br /><br />
+
+    <button id="saveProfileBtn">Сохранить</button>
   </div>
 
-  <!-- Подключаем Socket.io клиент -->
+  <!-- Контейнер чата -->
+  <div id="chatContainer">
+    <div id="partnerInfo">
+      <span id="partnerLabel">Собеседник: -</span>
+      <button id="skipBtn">Следующий</button>
+    </div>
+    <div id="chat">
+      <div class="system-message">Ожидание подключения к собеседнику...</div>
+    </div>
+    <div id="inputArea">
+      <input type="text" id="messageInput" placeholder="Введите сообщение..." />
+      <button id="sendBtn">Отправить</button>
+    </div>
+  </div>
+
+  <!-- Socket.io -->
   <script src="/socket.io/socket.io.js"></script>
   <script>
-    // Инициализация Telegram WebApp (если нужно учитывать initData и т.д.)
-    if (window.Telegram && Telegram.WebApp) {
-      Telegram.WebApp.ready();
-      // Можно получить некоторые данные о пользователе
-      // const initData = Telegram.WebApp.initDataUnsafe;
-      // Но мы не будем раскрывать их собеседнику, т.к. чат анонимный
-    }
+    const socket = io();
 
-    const socket = io(); // автоматически подключится на текущий домен
+    // Элементы DOM
+    const profileForm = document.getElementById('profileForm');
+    const nicknameInput = document.getElementById('nickname');
+    const genderSelect = document.getElementById('gender');
+    const ageInput = document.getElementById('age');
+    const saveProfileBtn = document.getElementById('saveProfileBtn');
 
+    const chatContainer = document.getElementById('chatContainer');
     const chat = document.getElementById('chat');
+    const partnerLabel = document.getElementById('partnerLabel');
+    const skipBtn = document.getElementById('skipBtn');
+
     const messageInput = document.getElementById('messageInput');
     const sendBtn = document.getElementById('sendBtn');
 
-    // При готовности чата
-    socket.on('chatReady', () => {
-      addSystemMessage('Пара найдена! Можете начинать общение.');
+    // Локальные переменные
+    let partnerId = null;
+
+    // 1. Сохранение профиля
+    saveProfileBtn.addEventListener('click', () => {
+      const nickname = nicknameInput.value.trim();
+      const gender = genderSelect.value;
+      const age = ageInput.value.trim();
+
+      if (!nickname || !age) {
+        alert('Введите ник и возраст!');
+        return;
+      }
+      // Отправляем профиль на сервер
+      socket.emit('setProfile', { nickname, gender, age });
+
+      // Скрываем форму, показываем чат
+      profileForm.style.display = 'none';
+      chatContainer.style.display = 'flex';
+
+      addSystemMessage('Ищем собеседника...');
     });
 
-    // При получении сообщения от собеседника
-    socket.on('receiveMessage', (data) => {
-      addPartnerMessage(data.text);
+    // 2. Когда сервер говорит "chatReady", чат создан
+    socket.on('chatReady', (data) => {
+      partnerId = data.partnerId;
+      const p = data.partnerProfile;
+      // Показываем на экране информацию о партнёре
+      partnerLabel.innerText = `Собеседник: ${p.nickname} (${p.gender === 'm' ? 'М' : 'Ж'}, ${p.age} лет)`;
+      addSystemMessage('Собеседник найден! Можете общаться.');
     });
 
-    // Когда собеседник покинул чат
+    // 3. Получение сообщения от собеседника
+    socket.on('receiveMessage', (msg) => {
+      addPartnerMessage(msg.text);
+    });
+
+    // 4. Если собеседник покинул чат
     socket.on('partnerLeft', () => {
-      addSystemMessage('Собеседник вышел. Обновите страницу, чтобы начать новый чат.');
+      addSystemMessage('Собеседник вышел из чата. Нажмите "Следующий" или обновите страницу.');
+      partnerLabel.innerText = 'Собеседник: -';
+      partnerId = null;
     });
 
-    // Отправка сообщения
+    // 5. Отправка сообщения
     sendBtn.addEventListener('click', sendMessage);
     messageInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
@@ -104,13 +196,23 @@
 
     function sendMessage() {
       const text = messageInput.value.trim();
-      if (!text) return;
+      if (!text || !partnerId) return;
       socket.emit('sendMessage', text);
       addMyMessage(text);
       messageInput.value = '';
     }
 
-    // Утилиты для отображения сообщений в чате
+    // 6. Кнопка "Следующий" (skip)
+    skipBtn.addEventListener('click', () => {
+      // Запрос серверу пропустить текущего собеседника
+      socket.emit('skip');
+      // Очистим чат и информацию
+      partnerLabel.innerText = 'Собеседник: -';
+      chat.innerHTML = '';
+      addSystemMessage('Ищем нового собеседника...');
+    });
+
+    // Утилиты для отображения сообщений
     function addMyMessage(text) {
       const div = document.createElement('div');
       div.className = 'my-message';
