@@ -3,24 +3,20 @@ const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
-const multer = require('multer');
-const fs = require('fs');
-
-// -- ИНИЦИАЛИЗАЦИЯ EXPRESS/IO --
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Раздаём статику из public
+// 1) Раздаём статические файлы (index.html, css/js) из папки public
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Настройка отдачи загруженных файлов (папка uploads):
-// чтобы файл по адресу /uploads/filename был доступен
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// 2) Тестовый маршрут
+app.get('/ping', (req, res) => {
+  res.send('Server is running!');
+});
 
-// -- ПОДКЛЮЧЕНИЕ К SQLite --
-
+// -------------------- ПОДКЛЮЧЕНИЕ К SQLite --------------------
 const db = new sqlite3.Database('./chat.db', (err) => {
   if (err) {
     console.error('Ошибка подключения к SQLite:', err);
@@ -29,12 +25,14 @@ const db = new sqlite3.Database('./chat.db', (err) => {
   }
 });
 
+// Создаём таблицы, если не существуют
 db.run(`
   CREATE TABLE IF NOT EXISTS users (
     socket_id TEXT PRIMARY KEY,
     nickname TEXT,
     gender TEXT,
     age INTEGER,
+    interests TEXT,        -- тут храним JSON со списком интересов
     connected_at INTEGER
   )
 `);
@@ -49,173 +47,162 @@ db.run(`
   )
 `);
 
-// -- МЕХАНИЗМ ОЧЕРЕДИ --
+// -------------------- ДАННЫЕ В ПАМЯТИ (очередь + пары) --------------------
+// queue: [{ socketId, ip, interests: string[] }, ... ]
+let waitingUsers = [];
 
-let waitingUsers = []; // [{ socketId, ip }, ...]
-const userPairs = {}; // { socketId: partnerSocketId }
+// пары: { socketId: partnerSocketId }
+const userPairs = {};
 
-// -- МАРШРУТ /ping (проверка) --
-app.get('/ping', (req, res) => {
-  res.send('Server is running!');
-});
-
-// -- НАСТРОЙКА MULTER ДЛЯ ЗАГРУЗКИ ФАЙЛОВ --
-
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads'); // кладём в папку uploads
-  },
-  filename: function (req, file, cb) {
-    // указываем уникальное имя файла, например, Date.now + оригинальное имя
-    const uniqueName = Date.now() + '-' + file.originalname;
-    cb(null, uniqueName);
-  }
-});
-
-const upload = multer({ storage });
-
-// -- МАРШРУТ ДЛЯ ПРИЁМА ФАЙЛОВ --
-
-app.post('/upload', upload.single('file'), (req, res) => {
-  // файл сохранён в req.file
-  if (!req.file) {
-    return res.status(400).json({ error: 'No file uploaded' });
-  }
-  // Возвращаем клиенту путь к файлу
-  const fileUrl = `/uploads/${req.file.filename}`;
-  res.json({ fileUrl });
-});
-
-// -- ЛОГИКА SOCKET.IO --
-
+// -------------------- SOCKET.IO ЛОГИКА --------------------
 io.on('connection', (socket) => {
   console.log('New client connected:', socket.id);
 
-  // Сохраняем в БД юзера (без профиля)
+  // При подключении создаём запись в users (минимальная)
   db.run(
     `INSERT INTO users (socket_id, connected_at) VALUES (?, ?)`,
     [socket.id, Date.now()],
-    (err) => {
-      if (err) console.error('Ошибка INSERT в users:', err);
-    }
+    (err) => { if (err) console.error('Ошибка INSERT в users:', err); }
   );
 
-  // Получаем профиль
+  // Сохранение/обновление профиля (приходит от клиента)
   socket.on('setProfile', (profile) => {
-    const { nickname, gender, age } = profile;
+    // profile = { nickname, gender, age, interests: string[] }
+    const { nickname, gender, age, interests } = profile;
+    const interestsJSON = JSON.stringify(interests || []);
 
-    // Обновляем запись в БД
     db.run(
-      `UPDATE users SET nickname=?, gender=?, age=? WHERE socket_id=?`,
-      [nickname, gender, age, socket.id],
+      `UPDATE users
+       SET nickname=?, gender=?, age=?, interests=?
+       WHERE socket_id=?`,
+      [nickname, gender, age, interestsJSON, socket.id],
       (err) => {
         if (err) console.error('Ошибка UPDATE профиля:', err);
       }
     );
 
+    // Считываем IP
+    const ip = socket.handshake.address;
+
+    // Сразу добавляем в очередь (или обновляем, если уже был)
+    // Но сначала получим у нас уже есть запись?
+    // Проще удалить старую запись из waitingUsers
+    waitingUsers = waitingUsers.filter(u => u.socketId !== socket.id);
+
+    // Добавим
+    waitingUsers.push({
+      socketId: socket.id,
+      ip,
+      interests: interests || []
+    });
+    console.log(`setProfile -> user ${socket.id} => ${nickname}, interests=${interests}`);
+
+    // Пытаемся найти собеседника
     matchOrWait(socket);
   });
 
-  // Текстовые сообщения
-  socket.on('sendMessage', (message) => {
+  // Отправка текстового сообщения
+  socket.on('sendMessage', (text) => {
     const partnerId = userPairs[socket.id];
     if (partnerId) {
-      // Пишем в БД
+      // Сохраним в chat_logs
       db.run(
         `INSERT INTO chat_logs (from_socket, to_socket, message, timestamp)
          VALUES (?, ?, ?, ?)`,
-        [socket.id, partnerId, message, Date.now()],
-        (err) => {
-          if (err) console.error('Ошибка INSERT chat_logs:', err);
-        }
+        [socket.id, partnerId, text, Date.now()],
+        (err) => { if (err) console.error('Ошибка INSERT chat_logs:', err); }
       );
 
-      // Отправляем партнёру
-      io.to(partnerId).emit('receiveMessage', { text: message });
+      // Отправим партнёру
+      io.to(partnerId).emit('receiveMessage', { text });
     }
   });
 
-  // Медиа-сообщения (клиент сначала загружает на /upload, потом шлёт сюда event)
-  socket.on('sendMedia', (fileUrl) => {
-    const partnerId = userPairs[socket.id];
-    if (partnerId) {
-      // Можно логировать отдельно, или в ту же таблицу
-      const msg = '[MEDIA] ' + fileUrl;
-      db.run(
-        `INSERT INTO chat_logs (from_socket, to_socket, message, timestamp)
-         VALUES (?, ?, ?, ?)`,
-        [socket.id, partnerId, msg, Date.now()],
-        (err) => {
-          if (err) console.error('Ошибка INSERT chat_logs (media):', err);
-        }
-      );
-      // Отправим событие собеседнику
-      io.to(partnerId).emit('receiveMedia', { fileUrl });
-    }
-  });
-
-  // Следующий
+  // Когда пользователь нажимает "следующий"
   socket.on('skip', () => {
     endChat(socket.id);
+    // возвращаем в очередь
+    // но user уже в waitingUsers. Просто matchOrWait заново
     matchOrWait(socket);
   });
 
   // Отключение
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
+
+    // Удалим из очереди
     waitingUsers = waitingUsers.filter(u => u.socketId !== socket.id);
+
+    // Разорвём пару
     endChat(socket.id);
 
+    // Удалим из users (чтобы в БД оставались только активные)
     db.run(`DELETE FROM users WHERE socket_id=?`, [socket.id], (err) => {
       if (err) console.error('Ошибка DELETE user:', err);
     });
   });
 });
 
-// Функция подбора пары
+// -------------------- ФУНКЦИИ --------------------
+
+// matchOrWait: проверяем, не найдём ли подходящего собеседника в очереди
+// Логика: есть ли в очереди кто-то с другим IP и пересечением интересов
 function matchOrWait(socket) {
-  const socketId = socket.id;
-  const ip = socket.handshake.address;
+  const meId = socket.id;
+  // Возьмём мою запись из waitingUsers (только что обновили)
+  const me = waitingUsers.find(u => u.socketId === meId);
+  if (!me) {
+    // если нет - значит ещё не сохранён профиль
+    console.log(`User ${meId} not in waitingUsers yet.`);
+    return;
+  }
 
   let foundIndex = -1;
   for (let i = 0; i < waitingUsers.length; i++) {
-    const w = waitingUsers[i];
-    // условие "другой ip" (не сам себе)
-    if (w.ip !== ip) {
+    const candidate = waitingUsers[i];
+    if (candidate.socketId === meId) continue; // сам себе - нет
+    // IP-check
+    if (candidate.ip === me.ip) continue; // не мэчим одного IP
+    // пересечение интересов
+    if (hasIntersection(me.interests, candidate.interests)) {
       foundIndex = i;
       break;
     }
   }
 
   if (foundIndex === -1) {
-    // Добавим в очередь
-    waitingUsers.push({ socketId, ip });
-    console.log(`Socket ${socketId} is now waiting`);
+    // Никого не нашли - остаёмся в очереди
+    console.log(`User ${meId} is waiting ( interests = ${me.interests} )`);
   } else {
-    // Мэчим
+    // Нашли
     const partner = waitingUsers[foundIndex];
+    // Убираем партнёра из очереди
     waitingUsers.splice(foundIndex, 1);
+    // Убираем и самого себя из очереди
+    waitingUsers = waitingUsers.filter(u => u.socketId !== meId);
 
-    userPairs[socketId] = partner.socketId;
-    userPairs[partner.socketId] = socketId;
+    // Формируем пару
+    userPairs[meId] = partner.socketId;
+    userPairs[partner.socketId] = meId;
 
-    // Получаем профили
-    db.get(`SELECT nickname, gender, age FROM users WHERE socket_id=?`, [socketId], (err, myProfile) => {
-      db.get(`SELECT nickname, gender, age FROM users WHERE socket_id=?`, [partner.socketId], (err2, partnerProfile) => {
-        io.to(socketId).emit('chatReady', {
+    // Грузим профили из БД для chatReady
+    db.get(`SELECT nickname, gender, age FROM users WHERE socket_id=?`, [meId], (errA, myRow) => {
+      db.get(`SELECT nickname, gender, age FROM users WHERE socket_id=?`, [partner.socketId], (errB, partnerRow) => {
+        io.to(meId).emit('chatReady', {
           partnerId: partner.socketId,
-          partnerProfile
+          partnerProfile: partnerRow || {}
         });
         io.to(partner.socketId).emit('chatReady', {
-          partnerId: socketId,
-          partnerProfile: myProfile
+          partnerId: meId,
+          partnerProfile: myRow || {}
         });
-        console.log(`Socket ${socketId} matched with ${partner.socketId}`);
+        console.log(`Matched: ${meId} <-> ${partner.socketId}`);
       });
     });
   }
 }
 
+// Разорвать пару
 function endChat(userId) {
   const partnerId = userPairs[userId];
   if (partnerId) {
@@ -226,7 +213,12 @@ function endChat(userId) {
   }
 }
 
-// Запуск
+// Утилита: пересечение интересов
+function hasIntersection(arr1, arr2) {
+  return arr1.some(item => arr2.includes(item));
+}
+
+// -------------------- ЗАПУСК СЕРВЕРА --------------------
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
