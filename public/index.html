@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <title>Anon Chat Fresh</title>
 
-  <!-- Адаптивность под мобильные -->
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Адаптивность: для iOS важно "viewport-fit=cover" -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 
   <style>
     /* Сброс */
@@ -15,30 +15,31 @@
       padding: 0;
     }
 
-    /* Базовые стили страницы: приятный градиент */
     html, body {
       width: 100%;
       height: 100%;
       font-family: "Helvetica Neue", Arial, sans-serif;
-      background: linear-gradient(135deg, #CDE6FE 0%, #DEF7FE 100%);
+      background: linear-gradient(135deg, #CDE6FE, #DEF7FE);
       color: #333;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      -webkit-user-select: none; /* чтобы случайно не выделять текст на мобильном */
+      user-select: none;
+      overscroll-behavior: none;
     }
 
-    /* Обёртка чата, фиксированный размер 422×625, но при меньших экранах - 100% */
+    /* Контейнер приложения */
     #mainWrapper {
       width: 422px;
       height: 625px;
       background: #fff;
       border-radius: 16px;
       box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+      margin: auto;
       display: flex;
       flex-direction: column;
       overflow: hidden;
     }
 
+    /* Если экран меньше 422x625, растягиваем на 100% */
     @media (max-width: 422px) {
       #mainWrapper {
         width: 100%;
@@ -46,31 +47,31 @@
         border-radius: 0;
       }
     }
-    /* При очень маленькой высоте оставляем 100% */
     @media (max-height: 625px) {
       #mainWrapper {
         height: 100%;
       }
     }
 
-    /* Шапка профиля */
+    /* Форма профиля */
     #profileForm {
       padding: 16px;
       background: linear-gradient(135deg, #F7F7F7, #EFEFEF);
       box-shadow: inset 0 -1px 1px rgba(0,0,0,0.05);
+      flex-shrink: 0;
     }
     #profileForm h3 {
       margin-bottom: 12px;
       font-weight: 600;
       color: #444;
+      font-size: 16px;
     }
-    #profileForm label {
-      display: block;
+    #profileForm .label {
       font-weight: 600;
       margin-bottom: 5px;
+      display: block;
     }
-    #profileForm input,
-    #profileForm select {
+    #profileForm input {
       width: 100%;
       padding: 8px;
       margin-bottom: 12px;
@@ -78,6 +79,70 @@
       border-radius: 6px;
       font-size: 14px;
     }
+
+    /* Выбор пола кнопками */
+    #genderButtons {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .gender-btn {
+      flex: 1;
+      padding: 8px 0;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+      transition: background 0.2s ease;
+    }
+    .gender-btn.active {
+      background: #a6e4bb;
+      border-color: #70c16d;
+      color: #fff;
+    }
+    .male-btn {
+      background: #93d0f3;
+      border-color: #61b8ee;
+      color: #fff;
+    }
+    .male-btn.active {
+      background: #61b8ee;
+    }
+    .female-btn {
+      background: #f7b8d9;
+      border-color: #f38cbf;
+      color: #fff;
+    }
+    .female-btn.active {
+      background: #f38cbf;
+    }
+
+    /* Кнопки интересов */
+    #interestsContainer {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .interest-btn {
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      cursor: pointer;
+      background: #fff;
+      color: #666;
+      font-size: 12px;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+    .interest-btn.active {
+      background: #5fd39f;
+      border-color: #4db681;
+      color: #fff;
+    }
+
+    /* Кнопка "Начать" */
     #profileForm button {
       display: inline-block;
       background: #87d37c;
@@ -96,12 +161,11 @@
     /* Чат-контейнер */
     #chatContainer {
       flex: 1;
-      display: none; /* скрыт до входа */
+      display: none;
       flex-direction: column;
       background: #fff;
+      position: relative;
     }
-
-    /* Верхняя панель (информация о партнёре) */
     #partnerInfo {
       display: flex;
       align-items: center;
@@ -111,6 +175,7 @@
       box-shadow: inset 0 -1px 1px rgba(0,0,0,0.05);
       font-weight: 600;
       border-bottom: 1px solid #eee;
+      flex-shrink: 0;
     }
     #skipBtn {
       background: #f76c6c;
@@ -126,12 +191,12 @@
       background: #ef5a5a;
     }
 
-    /* Окно сообщений */
+    /* Чат-окно */
     #chat {
       flex: 1;
       padding: 12px;
       overflow-y: auto;
-      background: #ebf1f5; /* нежный фон */
+      background: #ebf1f5;
       display: flex;
       flex-direction: column;
     }
@@ -142,7 +207,6 @@
       margin: 10px 0;
       font-style: italic;
     }
-    /* Анимация появления сообщения */
     .chat-msg {
       opacity: 0;
       animation: fadeIn 0.3s forwards;
@@ -150,7 +214,6 @@
     @keyframes fadeIn {
       to { opacity: 1; }
     }
-
     .my-message,
     .partner-message {
       max-width: 70%;
@@ -164,14 +227,12 @@
       margin-left: auto;
       background: linear-gradient(135deg, #a6e4bb, #5fd39f);
       color: #fff;
-      text-align: left;
       margin-right: 8px;
       border-bottom-right-radius: 0;
     }
     .partner-message {
       margin-right: auto;
       background: #fff;
-      text-align: left;
       margin-left: 8px;
       border: 1px solid #ddd;
       border-bottom-left-radius: 0;
@@ -184,6 +245,7 @@
       padding: 8px;
       border-top: 1px solid #eee;
       background: linear-gradient(135deg, #F2F2F2, #FBFBFB);
+      flex-shrink: 0;
     }
     #messageInput {
       flex: 1;
@@ -213,20 +275,44 @@
   <div id="mainWrapper">
     <!-- Форма профиля -->
     <div id="profileForm">
-      <h3>Создайте анонимный профиль 🌟</h3>
-      <label for="nickname">Ник (только буквы)</label>
-      <input type="text" id="nickname" placeholder="Введите ник..." />
+      <h3>Анонимный профиль 🚀</h3>
 
-      <label for="gender">Пол</label>
-      <select id="gender">
-        <option value="m">Мужской</option>
-        <option value="f">Женский</option>
-      </select>
+      <span class="label">Ник (только буквы)</span>
+      <input
+        type="text"
+        id="nickname"
+        placeholder="Введите ник..."
+        autocomplete="off"
+        autocorrect="off"
+        spellcheck="false"
+      />
 
-      <label for="age">Возраст (только цифры)</label>
-      <input type="text" id="age" placeholder="25" />
+      <span class="label">Пол</span>
+      <div id="genderButtons">
+        <button class="gender-btn male-btn" data-value="m">🍆 М</button>
+        <button class="gender-btn female-btn" data-value="f">🍑 Ж</button>
+      </div>
 
-      <button id="saveProfileBtn">Начать 🚀</button>
+      <span class="label">Возраст (только цифры)</span>
+      <!-- numeric keyboard hint -->
+      <input
+        id="age"
+        type="number"
+        placeholder="25"
+        inputmode="numeric"
+        pattern="[0-9]*"
+      />
+
+      <span class="label">Интересы</span>
+      <div id="interestsContainer">
+        <button class="interest-btn" data-value="Флирт">Флирт</button>
+        <button class="interest-btn" data-value="Секс">Секс</button>
+        <button class="interest-btn" data-value="Общение">Общение</button>
+        <button class="interest-btn" data-value="Игры">Игры</button>
+        <button class="interest-btn" data-value="Обоссать в толчке">Обоссать в толчке</button>
+      </div>
+
+      <button id="saveProfileBtn">Начать</button>
     </div>
 
     <!-- Чат -->
@@ -249,12 +335,14 @@
   <script>
     const socket = io();
 
-    // Блоки
     const mainWrapper = document.getElementById('mainWrapper');
     const profileForm = document.getElementById('profileForm');
     const nicknameInput = document.getElementById('nickname');
-    const genderSelect = document.getElementById('gender');
+    const genderButtons = document.querySelectorAll('.gender-btn');
+    let selectedGender = null;
+
     const ageInput = document.getElementById('age');
+    const interestsContainer = document.getElementById('interestsContainer');
     const saveProfileBtn = document.getElementById('saveProfileBtn');
 
     const chatContainer = document.getElementById('chatContainer');
@@ -266,32 +354,78 @@
     const sendBtn = document.getElementById('sendBtn');
 
     let partnerId = null;
+    let selectedInterests = new Set(); // храним выбранные интересы
 
-    // Сохранение профиля
+    // Обработка клика по кнопкам пола
+    genderButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        // Убираем active со всех
+        genderButtons.forEach(b => b.classList.remove('active'));
+        // Ставим active на выбранную
+        btn.classList.add('active');
+        // Запоминаем значение
+        selectedGender = btn.dataset.value; // 'm' или 'f'
+      });
+    });
+
+    // Обработка клика по интересам
+    interestsContainer.addEventListener('click', (e) => {
+      if (e.target.classList.contains('interest-btn')) {
+        const val = e.target.dataset.value; // название интереса
+        if (selectedInterests.has(val)) {
+          // Снимем выбор
+          selectedInterests.delete(val);
+          e.target.classList.remove('active');
+        } else {
+          // Добавим выбор
+          selectedInterests.add(val);
+          e.target.classList.add('active');
+        }
+      }
+    });
+
+    // Кнопка "Начать"
     saveProfileBtn.addEventListener('click', () => {
       const nickname = nicknameInput.value.trim();
-      const gender = genderSelect.value;
+      const gender = selectedGender; // 'm' или 'f'
       const age = ageInput.value.trim();
 
-      // Проверка ника (только буквы)
+      // Валидация ника (только буквы)
       if (!/^[A-Za-zА-Яа-я]+$/.test(nickname)) {
         alert('Ник может содержать только буквы (без цифр и символов).');
         return;
       }
-      // Проверка возраста (только цифры)
+      // Валидация возраста (только цифры)
       if (!/^\d+$/.test(age)) {
         alert('Возраст должен содержать только цифры.');
         return;
       }
       if (!nickname || !age) {
-        alert('Введите ник и возраст!');
+        alert('Заполните ник и возраст!');
+        return;
+      }
+      if (!gender) {
+        alert('Выберите пол!');
+        return;
+      }
+      if (selectedInterests.size === 0) {
+        alert('Выберите хотя бы один интерес!');
         return;
       }
 
-      socket.emit('setProfile', { nickname, gender, age });
+      // Собираем интересы в массив
+      const interestsArray = Array.from(selectedInterests);
+
+      // Отправляем на сервер
+      socket.emit('setProfile', {
+        nickname,
+        gender,
+        age,
+        interests: interestsArray
+      });
+
       profileForm.style.display = 'none';
       chatContainer.style.display = 'flex';
-
       addSystemMessage('🔎 Ищем собеседника...');
     });
 
@@ -303,7 +437,7 @@
       addSystemMessage('🎉 Собеседник найден! Начинайте общаться.');
     });
 
-    // Когда приходит сообщение
+    // Приход сообщения
     socket.on('receiveMessage', (msg) => {
       addPartnerMessage(msg.text);
     });
@@ -318,21 +452,15 @@
     // Отправка сообщения
     sendBtn.addEventListener('click', sendMessage);
     messageInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        sendMessage();
-      }
+      if (e.key === 'Enter') sendMessage();
     });
-
     function sendMessage() {
       const text = messageInput.value.trim();
       if (!text || !partnerId) return;
-
       socket.emit('sendMessage', text);
       addMyMessage(text);
-
-      // Очистка поля + убираем клавиатуру (blur) на мобильных
       messageInput.value = '';
-      messageInput.blur();
+      messageInput.blur(); // сворачиваем клавиатуру на мобильном
     }
 
     // Следующий
@@ -352,7 +480,6 @@
       chat.appendChild(div);
       chat.scrollTop = chat.scrollHeight;
     }
-
     function addPartnerMessage(text) {
       const div = document.createElement('div');
       div.className = 'partner-message chat-msg';
@@ -360,7 +487,6 @@
       chat.appendChild(div);
       chat.scrollTop = chat.scrollHeight;
     }
-
     function addSystemMessage(text) {
       const div = document.createElement('div');
       div.className = 'system-message chat-msg';
