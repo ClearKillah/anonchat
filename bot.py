@@ -1,48 +1,60 @@
 const TelegramBot = require('node-telegram-bot-api');
 
-// Ваш токен, полученный от @BotFather
+// Твой токен прямо в коде
 const token = '8039344227:AAFuRzP92ZoGOxRC3EOWF-OXVIyjfFnh9NA';
 
-// URL вашего WebApp — обязательно с https://
+// URL WebApp (замени на свой)
 const WEBAPP_URL = 'https://anonchat-production-5964.up.railway.app/';
 
 // Создаём бота в режиме polling
 const bot = new TelegramBot(token, { polling: true });
 
-// Обработка команды /start
-bot.onText(/\/start/, (msg) => {
-  const chatId = msg.chat.id;
+console.log("✅ Бот успешно запущен!");
 
-  const welcomeText = `
+// Обработка команды /start
+bot.onText(/\/start/, async (msg) => {
+  try {
+    const chatId = msg.chat.id;
+
+    const welcomeText = `
 Привет! Добро пожаловать в *Анонимный Чат*.
 
 Нажмите на кнопку ниже, чтобы открыть наше мини-приложение и найти собеседника.
-  `;
+    `;
 
-  bot.sendMessage(chatId, welcomeText, {
-    parse_mode: 'Markdown',
-    reply_markup: {
-      inline_keyboard: [
-        [
-          {
-            text: 'Открыть чат',
-            web_app: {
-              url: WEBAPP_URL
+    await bot.sendMessage(chatId, welcomeText, {
+      parse_mode: 'Markdown',
+      reply_markup: {
+        inline_keyboard: [
+          [
+            {
+              text: 'Открыть чат',
+              web_app: {
+                url: WEBAPP_URL
+              }
             }
-          }
+          ]
         ]
-      ]
-    }
-  }).then((data) => {
-    console.log("Приветственное сообщение отправлено:", data);
-  }).catch((err) => {
-    console.error("Ошибка отправки приветственного сообщения:", err);
-  });
+      }
+    });
+
+    console.log(`🚀 Приветственное сообщение отправлено пользователю ${chatId}`);
+  } catch (error) {
+    console.error("❌ Ошибка при обработке команды /start:", error);
+  }
 });
 
 // Обработка любых других сообщений
-bot.on('message', (msg) => {
-  if (msg.text && !msg.text.startsWith('/start')) {
-    bot.sendMessage(msg.chat.id, 'Напишите /start, чтобы открыть чат 😉');
+bot.on('message', async (msg) => {
+  try {
+    const chatId = msg.chat.id;
+    const text = msg.text || '';
+
+    // Игнорируем повторную обработку /start
+    if (text.startsWith('/start')) return;
+
+    await bot.sendMessage(chatId, 'Напишите /start, чтобы открыть чат 😉');
+  } catch (error) {
+    console.error("❌ Ошибка при обработке сообщения:", error);
   }
 });
