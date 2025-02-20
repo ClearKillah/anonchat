@@ -1,22 +1,22 @@
 const TelegramBot = require('node-telegram-bot-api');
 
-// Замените на ваш токен, выданный BotFather
+// Используйте переменную окружения или ваш токен
 const token = process.env.BOT_TOKEN || '8039344227:AAFuRzP92ZoGOxRC3EOWF-OXVIyjfFnh9NA';
 
 // Создаём бота в режиме polling
 const bot = new TelegramBot(token, { polling: true });
 
-// Этот URL — ваш WebApp (анонимный чат), например, домен Railway
-const WEBAPP_URL = 'https://anonchat-production-5964.up.railway.app'; 
+// URL вашего WebApp — обязательно с https://
+const WEBAPP_URL = 'https://anonchat-production-5964.up.railway.app';
 
-// Обработка /start
+// Обработка команды /start
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
 
   const welcomeText = `
 Привет! Добро пожаловать в *Анонимный Чат*.
 
-Нажмите на кнопку, чтобы открыть наш мини-приложение и найти собеседника.  
+Нажмите на кнопку ниже, чтобы открыть наше мини-приложение и найти собеседника.
   `;
 
   bot.sendMessage(chatId, welcomeText, {
@@ -36,7 +36,7 @@ bot.onText(/\/start/, (msg) => {
   });
 });
 
-// Для теста: реагируем на любые другие сообщения
+// Для теста: если сообщение не /start, посылаем инструкцию
 bot.on('message', (msg) => {
   if (msg.text && !/^\/start/.test(msg.text)) {
     bot.sendMessage(msg.chat.id, 'Напишите /start, чтобы открыть чат 😉');
