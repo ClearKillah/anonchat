@@ -1,6 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api');
 
-// Замените '8039344227:AAFuRzP92ZoGOxRC3EOWF-OXVIyjfFnh9NA' на токен вашего бота, полученный от @BotFather
+// Ваш токен, полученный от @BotFather
 const token = '8039344227:AAFuRzP92ZoGOxRC3EOWF-OXVIyjfFnh9NA';
 
 // URL вашего WebApp — обязательно с https://
