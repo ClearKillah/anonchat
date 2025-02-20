@@ -1,19 +1,16 @@
 const TelegramBot = require('node-telegram-bot-api');
 
-// Используйте переменную окружения или ваш токен
-const token = process.env.BOT_TOKEN || '8039344227:AAFuRzP92ZoGOxRC3EOWF-OXVIyjfFnh9NA';
-console.log("Token:", token);
+// Замените '8039344227:AAFuRzP92ZoGOxRC3EOWF-OXVIyjfFnh9NA' на токен вашего бота, полученный от @BotFather
+const token = '8039344227:AAFuRzP92ZoGOxRC3EOWF-OXVIyjfFnh9NA';
+
+// URL вашего WebApp — обязательно с https://
+const WEBAPP_URL = 'https://anonchat-production-5964.up.railway.app/';
 
 // Создаём бота в режиме polling
 const bot = new TelegramBot(token, { polling: true });
 
-// URL вашего WebApp — обязательно с https://
-const WEBAPP_URL = 'https://anonchat-production-5964.up.railway.app';
-console.log("WEBAPP_URL:", WEBAPP_URL);
-
 // Обработка команды /start
 bot.onText(/\/start/, (msg) => {
-  console.log("Получена команда /start от:", msg.chat.id);
   const chatId = msg.chat.id;
 
   const welcomeText = `
@@ -36,18 +33,16 @@ bot.onText(/\/start/, (msg) => {
         ]
       ]
     }
-  }, (err, data) => {
-    if (err) {
-      console.error("Ошибка отправки приветственного сообщения:", err);
-    } else {
-      console.log("Приветственное сообщение отправлено:", data);
-    }
+  }).then((data) => {
+    console.log("Приветственное сообщение отправлено:", data);
+  }).catch((err) => {
+    console.error("Ошибка отправки приветственного сообщения:", err);
   });
 });
 
 // Обработка любых других сообщений
 bot.on('message', (msg) => {
-  if (msg.text && !/^\/start/.test(msg.text)) {
+  if (msg.text && !msg.text.startsWith('/start')) {
     bot.sendMessage(msg.chat.id, 'Напишите /start, чтобы открыть чат 😉');
   }
 });
