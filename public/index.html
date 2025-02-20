@@ -2,21 +2,15 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>Anon Chat</title>
-
-  <!-- Запрет зума, адаптация под iPhone 14 Pro -->
-  <meta name="viewport"
-        content="width=device-width,
-                 initial-scale=1.0,
-                 maximum-scale=1,
-                 user-scalable=no,
-                 viewport-fit=cover"/>
-
+  <title>Anon Chat TMA</title>
+  <!-- Настройки viewport: запрещаем зум и учитываем safe-area -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <style>
-    /* Сброс */
+    /* Базовый сброс */
     * {
       box-sizing: border-box;
-      margin: 0; padding: 0;
+      margin: 0;
+      padding: 0;
     }
     html, body {
       width: 100%;
@@ -24,22 +18,45 @@
       background: linear-gradient(135deg, #c0e9ff, #e0f7ff);
       font-family: "Helvetica Neue", Arial, sans-serif;
       color: #333;
+      overflow: hidden;
+    }
+    /* Учитываем safe-area для iOS */
+    body {
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
     }
 
-    /* Контейнер на весь экран (Mini App) */
+    /* Основной контейнер приложения */
     #app {
       display: flex;
       flex-direction: column;
-      width: 100%;
-      height: 100%;
-      max-width: 420px;   /* чтобы на десктопе было не супершироко */
+      width: 100vw;
+      height: 100vh;
+      max-width: 420px;
       margin: 0 auto;
       background: #fff;
+      position: relative;
+    }
+
+    /* Режим ввода: если класс .input-focused добавлен, меняем расположение ввода */
+    #app.input-focused #chatContainer,
+    #app.input-focused #profileForm,
+    #app.input-focused #partnerInfo {
+      display: none;
+    }
+    #app.input-focused #inputArea {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 90%;
     }
 
     /* Форма регистрации */
     #profileForm {
-      background: #f0fbff; /* нежно-голубой */
+      background: #f0fbff;
       padding: 24px;
       flex-shrink: 0;
     }
@@ -48,12 +65,13 @@
       margin-bottom: 16px;
       text-align: center;
       font-weight: 700;
-      color: #005f99; /* более тёмно-синий */
+      color: #005f99;
     }
     .label {
       display: block;
       font-weight: 600;
       margin: 8px 0 4px;
+      font-size: 14px;
       color: #004466;
     }
     .form-input {
@@ -70,7 +88,7 @@
       border-color: #68b5ff;
     }
 
-    /* Кнопки пола (голубые) */
+    /* Выбор пола – яркие кнопки */
     #genderButtons {
       display: flex;
       gap: 12px;
@@ -78,24 +96,24 @@
     }
     .gender-btn {
       flex: 1;
-      padding: 10px 0;
+      padding: 12px 0;
       border-radius: 6px;
-      font-size: 14px;
-      font-weight: 600;
+      border: 2px solid #89c1ff;
+      font-size: 16px;
+      font-weight: 700;
       text-align: center;
       cursor: pointer;
       background: #a4d0ff;
       color: #002244;
-      border: 2px solid #89c1ff;
-      transition: 0.2s ease;
+      transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
     }
     .gender-btn.active {
-      background: #68b5ff;
+      background: #3596ff;
       border-color: #3596ff;
       color: #fff;
     }
 
-    /* Интересы (яркие голубые) */
+    /* Выбор интересов */
     #interestsContainer {
       display: flex;
       flex-wrap: wrap;
@@ -103,26 +121,27 @@
       margin-bottom: 16px;
     }
     .interest-btn {
-      padding: 8px 14px;
+      padding: 8px 12px;
       border-radius: 6px;
-      font-size: 13px;
-      font-weight: 600;
+      border: 2px solid #a4d0ff;
       background: #d0ecff;
       color: #005280;
-      border: 2px solid #a4d0ff;
+      font-size: 13px;
+      font-weight: 600;
       cursor: pointer;
-      transition: background 0.2s, color 0.2s;
+      transition: background 0.2s, border-color 0.2s, color 0.2s;
     }
     .interest-btn.active {
-      background: #68b5ff;
+      background: #3596ff;
       border-color: #3596ff;
       color: #fff;
     }
 
+    /* Кнопка НАЧАТЬ */
     #startBtn {
       width: 100%;
       padding: 14px;
-      background: #68b5ff;
+      background: #3596ff;
       color: #fff;
       border: none;
       border-radius: 8px;
@@ -130,16 +149,19 @@
       font-weight: 700;
       cursor: pointer;
       margin-top: 8px;
+      transition: background 0.2s;
+    }
+    #startBtn:hover {
+      background: #287acc;
     }
 
-    /* Чат */
+    /* Чатовая часть */
     #chatContainer {
-      flex: 1; /* растягиваем на оставшееся пространство */
-      display: none; /* скрыто, пока форма не заполнена */
+      flex: 1;
+      display: flex;
       flex-direction: column;
       background: #fff;
     }
-
     /* Шапка чата */
     #partnerInfo {
       flex-shrink: 0;
@@ -149,64 +171,53 @@
       font-weight: 600;
       border-bottom: 2px solid #a4d0ff;
     }
-    #skipBtn {
-      float: right;
-      background: #ff8a8a;
-      border: none;
-      padding: 6px 12px;
-      border-radius: 6px;
-      font-weight: 600;
-      color: #fff;
-      cursor: pointer;
-      margin-top: -2px;
-    }
-
     /* Окно сообщений */
     #chat {
       flex: 1;
       overflow-y: auto;
-      background: #e6f7ff;
-      padding: 10px;
-      position: relative; 
+      padding: 12px;
+      background: #ebf1f5;
     }
     .system-message {
       text-align: center;
       color: #666;
       font-style: italic;
       margin: 6px 0;
+      font-size: 14px;
     }
     .chat-msg {
       opacity: 0;
       animation: fadeIn 0.3s forwards;
     }
-    @keyframes fadeIn { to { opacity: 1; } }
-
+    @keyframes fadeIn {
+      to { opacity: 1; }
+    }
     .my-message,
     .partner-message {
       max-width: 70%;
       padding: 8px 12px;
-      margin: 4px 0;
+      margin: 6px 0;
       border-radius: 10px;
-      line-height: 1.4;
       word-wrap: break-word;
       font-size: 14px;
+      line-height: 1.4;
     }
     .my-message {
       margin-left: auto;
-      margin-right: 6px;
       background: #68b5ff;
       color: #fff;
+      margin-right: 6px;
       border-bottom-right-radius: 0;
     }
     .partner-message {
-      margin-left: 6px;
       margin-right: auto;
       background: #fff;
       border: 2px solid #a4d0ff;
+      margin-left: 6px;
       border-bottom-left-radius: 0;
     }
 
-    /* Панель ввода (flex, снизу) */
+    /* Панель ввода (обычный режим) */
     #inputArea {
       flex-shrink: 0;
       padding: 10px;
@@ -220,8 +231,8 @@
       border: 2px solid #a4d0ff;
       border-radius: 6px;
       font-size: 14px;
-      margin-right: 8px;
       outline: none;
+      transition: border-color 0.2s;
     }
     #messageInput:focus {
       border-color: #68b5ff;
@@ -230,11 +241,15 @@
       background: #68b5ff;
       color: #fff;
       border: none;
-      border-radius: 6px;
       padding: 10px 14px;
-      font-weight: 600;
-      cursor: pointer;
+      border-radius: 6px;
       font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    #sendBtn:hover {
+      background: #3596ff;
     }
   </style>
 </head>
@@ -242,19 +257,19 @@
 <div id="app">
   <!-- Форма регистрации -->
   <div id="profileForm">
-    <h3>Анонимный Профиль (Голубой)</h3>
+    <h3>АНОНИМНЫЙ ПРОФИЛЬ</h3>
 
     <span class="label">Ник (только буквы)</span>
-    <input id="nickname" class="form-input" type="text" placeholder="Введите ник..."/>
+    <input id="nickname" class="form-input" type="text" placeholder="Введите ник..." autocomplete="off"/>
 
     <span class="label">Пол</span>
     <div id="genderButtons">
-      <button class="gender-btn" data-value="m">М (🍆)</button>
-      <button class="gender-btn" data-value="f">Ж (🍑)</button>
+      <button class="gender-btn" data-value="m">🍆 М</button>
+      <button class="gender-btn" data-value="f">🍑 Ж</button>
     </div>
 
     <span class="label">Возраст (цифры)</span>
-    <input id="age" class="form-input" type="number" placeholder="25" />
+    <input id="age" class="form-input" type="number" placeholder="25" inputmode="numeric" pattern="[0-9]*"/>
 
     <span class="label">Интересы</span>
     <div id="interestsContainer">
@@ -268,23 +283,19 @@
     <button id="startBtn">НАЧАТЬ</button>
   </div>
 
-  <!-- Чатовая часть -->
+  <!-- Чат -->
   <div id="chatContainer">
-    <div id="partnerInfo">
-      Собеседник: - 
-      <button id="skipBtn">Следующий</button>
-    </div>
+    <div id="partnerInfo">Собеседник: -</div>
     <div id="chat">
-      <div class="system-message chat-msg">Ожидание собеседника...</div>
+      <div class="system-message chat-msg">👀 Ожидание собеседника...</div>
     </div>
     <div id="inputArea">
-      <input id="messageInput" type="text" placeholder="Введите сообщение..."/>
+      <input id="messageInput" type="text" placeholder="Введите сообщение..." />
       <button id="sendBtn">Отправить</button>
     </div>
   </div>
 </div>
 
-<!-- Подключение Socket.io-клиента (не забудьте /socket.io/socket.io.js на сервере) -->
 <script src="/socket.io/socket.io.js"></script>
 <script>
   const socket = io();
@@ -292,19 +303,15 @@
   // DOM-элементы
   const profileForm = document.getElementById('profileForm');
   const nicknameInput = document.getElementById('nickname');
+  const ageInput = document.getElementById('age');
   const genderBtns = document.querySelectorAll('.gender-btn');
   let selectedGender = null;
-
-  const ageInput = document.getElementById('age');
   const interestsContainer = document.getElementById('interestsContainer');
   let selectedInterests = new Set();
-
   const startBtn = document.getElementById('startBtn');
 
   const chatContainer = document.getElementById('chatContainer');
   const partnerInfo = document.getElementById('partnerInfo');
-  const skipBtn = document.getElementById('skipBtn');
-
   const chat = document.getElementById('chat');
   const messageInput = document.getElementById('messageInput');
   const sendBtn = document.getElementById('sendBtn');
@@ -334,35 +341,30 @@
     }
   });
 
-  // Кнопка НАЧАТЬ
+  // Кнопка "НАЧАТЬ"
   startBtn.addEventListener('click', () => {
     const nickname = nicknameInput.value.trim();
     const ageVal = ageInput.value.trim();
 
-    // Проверка ника (только буквы)
     if (!/^[A-Za-zА-Яа-я]+$/.test(nickname)) {
       alert('Ник может содержать только буквы!');
       nicknameInput.focus();
       return;
     }
-    // Возраст - цифры
     if (!/^\d+$/.test(ageVal)) {
-      alert('Возраст - только цифры!');
+      alert('Возраст должен быть числом!');
       ageInput.focus();
       return;
     }
-    // Пол выбран?
     if (!selectedGender) {
       alert('Выберите пол!');
       return;
     }
-    // Интересы?
     if (selectedInterests.size === 0) {
       alert('Выберите хотя бы один интерес!');
       return;
     }
 
-    // Отправляем профиль на сервер
     socket.emit('setProfile', {
       nickname,
       gender: selectedGender,
@@ -370,63 +372,58 @@
       interests: Array.from(selectedInterests)
     });
 
-    // Переходим к чату
     profileForm.style.display = 'none';
     chatContainer.style.display = 'flex';
+    addSystemMessage('🔎 Ищем собеседника...');
+
+    // Убираем фокус с формы и автофокус поля ввода через 300 мс
+    setTimeout(() => { messageInput.focus(); }, 300);
   });
 
-  // Сервер сказал: чат готов
+  // Когда сервер сообщает, что чат готов
   socket.on('chatReady', (data) => {
     partnerId = data.partnerId;
-    const p = data.partnerProfile;
-    partnerInfo.innerHTML = `Собеседник: ${p.nickname} (${p.gender === 'm' ? 'М' : 'Ж'}, ${p.age}) 
-      <button id="skipBtn">Следующий</button>`;
-    // нужно заново назначить skipBtn?
-    document.getElementById('skipBtn').addEventListener('click', skipChat);
-
-    addSystemMessage('Собеседник найден! Начинайте общение.');
+    const p = data.partnerProfile || {};
+    partnerInfo.innerText = `Собеседник: ${p.nickname} (${p.gender === 'm' ? 'М' : 'Ж'}, ${p.age} лет)`;
+    addSystemMessage('🎉 Собеседник найден! Начинайте общаться.');
+    setTimeout(() => { messageInput.focus(); }, 300);
   });
 
-  // Пришло сообщение
+  // Получение сообщения
   socket.on('receiveMessage', (msg) => {
     addPartnerMessage(msg.text);
   });
 
-  // Собеседник ушёл
+  // Когда собеседник ушёл
   socket.on('partnerLeft', () => {
-    addSystemMessage('Собеседник покинул чат.');
-    partnerInfo.innerHTML = `Собеседник: - <button id="skipBtn">Следующий</button>`;
+    addSystemMessage('❌ Собеседник ушёл.');
+    partnerInfo.innerHTML = 'Собеседник: -';
     partnerId = null;
-    document.getElementById('skipBtn').addEventListener('click', skipChat);
   });
-
-  // Кнопка "Следующий"
-  skipBtn.addEventListener('click', skipChat);
-  function skipChat() {
-    socket.emit('skip');
-    partnerId = null;
-    chat.innerHTML = `<div class="system-message chat-msg">Ищем нового собеседника...</div>`;
-    partnerInfo.innerHTML = 'Собеседник: - <button id="skipBtn">Следующий</button>';
-    document.getElementById('skipBtn').addEventListener('click', skipChat);
-  }
 
   // Отправка сообщения
   sendBtn.addEventListener('click', sendMessage);
   messageInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       sendMessage();
+      messageInput.blur(); // При клике Enter убираем клавиатуру
     }
   });
-
   function sendMessage() {
     const text = messageInput.value.trim();
     if (!text || !partnerId) return;
     socket.emit('sendMessage', text);
     addMyMessage(text);
     messageInput.value = '';
+    setTimeout(() => { messageInput.focus(); }, 300);
   }
 
-  // Утилиты
+  // Если пользователь кликает по чату – убрать клавиатуру
+  chat.addEventListener('click', () => {
+    messageInput.blur();
+  });
+
+  // Утилиты вывода сообщений
   function addSystemMessage(text) {
     const div = document.createElement('div');
     div.className = 'system-message chat-msg';
